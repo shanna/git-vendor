@@ -1,0 +1,102 @@
+#!/usr/bin/env ruby
+require 'optparse'
+
+class Vendor
+  FILE  = %q{.gitvendor}
+  USAGE = %q{
+usage:
+  git vendor <command>
+
+commands:
+  add     Add a vendored git repository.
+  remove  Remove a vendored git repository.
+  update  Update vendored git repositories.
+  }.strip
+
+  def help options = {}
+    puts USAGE
+  end
+
+=begin
+  def hooks options = {}
+    git_working_dir!
+    # TODO: Install checkout hooks to auto-run vendor install when switching branches.
+  end
+=end
+
+  def add section, url, path = nil, options = {}
+    git_working_dir!
+    # TODO: If path is nil grab it from the url.
+    # TODO: Check config doesn't exist.
+    # TODO: Check path isn't used.
+    # TODO: x!('git config -f %s ...', FILE) # each of url, path, refspec.
+    # TODO: install name
+  end
+
+  def remove section
+    git_working_dir!
+    x!('git config -f %s --remove-section %s', FILE, name)
+  end
+
+  def update section = nil, options = {}
+    git_working_dir!
+    git_config.each do |name, vendor|
+      next if section && name != section
+
+      puts 'vendor %s' % name
+      url, path, refspec = vendor.values_at('url', 'path', 'refspec')
+
+      unless Dir.exists?(vendor['path'])
+        puts 'clone %s %s' % [url, path]
+        x!('mkdir -p %s', path)
+        x!('git clone -q %s %s', url, path)
+      end
+
+      # TODO: clean/checkout correct refspec.
+      Dir.chdir(path) do
+      end
+    end
+  end
+
+  private
+    #--
+    # TODO: escape args.
+    def x! command, *args
+      result = %x{#{command % args}}.strip
+      $?.success? or exit(1)
+      result
+    end
+
+    def git_working_dir!
+      Dir.chdir(x!('git rev-parse --show-toplevel'))
+    end
+
+    #--
+    # TODO: Validate path, url and ref exist for each vendor section.
+    # TODO: Check for same config path with different URLs or ref.
+    def git_config
+      Dir["**/#{FILE}"].inject({}) do |sections, path|
+        x!('git config -l -f %s', path).split.each do |line|
+          fully_qualified_key, value      = line.split('=')
+          vendor, section, key            = fully_qualified_key.split('.')
+          (sections[section] ||= {})[key] = value if vendor == 'vendor'
+        end
+        sections
+      end
+    end
+end
+
+options = {}
+OptionParser.new do |o|
+  o.on('-h', '--help'){ options[:help] = true }
+  o.parse!
+end
+
+vendor  = Vendor.new
+command = (ARGV.shift || 'help').strip
+unless vendor.respond_to?(command)
+  warn %q{unknown command '%s'} % command
+  exit 1
+end
+vendor.send(command, *ARGV, options)
+
