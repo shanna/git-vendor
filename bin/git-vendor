@@ -1,11 +1,15 @@
 #!/usr/bin/env ruby
 require 'optparse'
 
+# TODO: Could be shell script so it runs just about anywhere?
 class Vendor
   FILE  = %q{.gitvendor}
   USAGE = %q{
 usage:
   git vendor <command>
+  git vendor add <name> <url> [<path>]
+  git vendor remove <name>
+  git vendor update [<name>]
 
 commands:
   add     Add a vendored git repository.
@@ -18,7 +22,7 @@ commands:
   end
 
 =begin
-  def hooks options = {}
+  def install options = {}
     git_working_dir!
     # TODO: Install checkout hooks to auto-run vendor install when switching branches.
   end
@@ -55,6 +59,8 @@ commands:
       # TODO: clean/checkout correct refspec.
       Dir.chdir(path) do
       end
+
+      # TODO: add path to a .gitignore in project if it isn't already.
     end
   end
 
@@ -68,6 +74,7 @@ commands:
     end
 
     def git_working_dir!
+      # TODO: Check we aren't inside another git project. cd .. and git rev-parse --show-toplevel again.
       Dir.chdir(x!('git rev-parse --show-toplevel'))
     end
 
