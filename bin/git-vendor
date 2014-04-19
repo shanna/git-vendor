@@ -17,7 +17,7 @@ commands:
   update  Update vendored git repositories.
   }.strip
 
-  def help options = {}
+  def help
     puts USAGE
   end
 
@@ -28,12 +28,12 @@ commands:
   end
 =end
 
-  def add section, url, path = nil, options = {}
+  def add section, url, path = nil, options
     git_working_dir!
     # TODO: If path is nil grab it from the url.
     # TODO: Check config doesn't exist.
     # TODO: Check path isn't used.
-    # TODO: x!('git config -f %s ...', FILE) # each of url, path, refspec.
+    # TODO: x!('git config -f %s ...', FILE) # each of url, path, branch.
     # TODO: install name
   end
 
@@ -42,22 +42,25 @@ commands:
     x!('git config -f %s --remove-section %s', FILE, name)
   end
 
-  def update section = nil, options = {}
+  def update section, options = {}
     git_working_dir!
     git_config.each do |name, vendor|
-      next if section && name != section
+      next if section && section != name
 
       puts 'vendor %s' % name
-      url, path, refspec = vendor.values_at('url', 'path', 'refspec')
+      url, path, branch = vendor.values_at('url', 'path', 'branch')
 
       unless Dir.exists?(vendor['path'])
         puts 'clone %s %s' % [url, path]
         x!('mkdir -p %s', path)
-        x!('git clone -q %s %s', url, path)
+        x!('git clone -q --depth=1 %s %s', url, path)
       end
 
-      # TODO: clean/checkout correct refspec.
       Dir.chdir(path) do
+        x!('git reset --hard')
+        x!('git clean -fXd')
+        x!('git checkout -q %s', branch || 'master')
+        x!('git pull')
       end
 
       # TODO: add path to a .gitignore in project if it isn't already.
@@ -96,14 +99,18 @@ end
 options = {}
 OptionParser.new do |o|
   o.on('-h', '--help'){ options[:help] = true }
+  o.on('-b', '--branch'){|name| options[:branch] = name }
   o.parse!
 end
 
 vendor  = Vendor.new
 command = (ARGV.shift || 'help').strip
-unless vendor.respond_to?(command)
-  warn %q{unknown command '%s'} % command
-  exit 1
+case command
+  when 'add'    then vendor.add(*ARGV, options)
+  when 'remove' then vendor.remove(ARGV[0], options)
+  when 'update' then vendor.update(ARGV[0], options)
+  else
+    warn %q{unknown command '%s'} % command
+    exit 1
 end
-vendor.send(command, *ARGV, options)
 
