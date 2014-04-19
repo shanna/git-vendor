@@ -4,7 +4,11 @@ Relaxed git submodules.
 
 ## Install
 
-TODO:
+### Make
+
+```
+sudo make install
+```
 
 ## Config
 
