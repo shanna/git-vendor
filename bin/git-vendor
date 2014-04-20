@@ -17,7 +17,7 @@ commands:
   update  Update vendored git repositories.
   }.strip
 
-  def help
+  def help options = {}
     puts USAGE
   end
 
@@ -28,42 +28,40 @@ commands:
   end
 =end
 
-  def add section, url, path = nil, options
+  def add url, path = nil, options = {}
+    path, options = nil, path if path.kind_of?(Hash) # Ugh.
+    url           = x!('git ls-remote --get-url %s', url)
+    section       = options.fetch(:name, File.basename(url.sub(/[^:]*:/,''), '.git'))
+    branch        = options.fetch(:branch, 'master')
+    path          ||= File.join('vendor', section)
+
     git_working_dir!
-    # TODO: If path is nil grab it from the url.
-    # TODO: Check config doesn't exist.
-    # TODO: Check path isn't used.
-    # TODO: x!('git config -f %s ...', FILE) # each of url, path, branch.
-    # TODO: install name
+    x!('git config -f %s vendor.%s.url %s',    FILE, section, url)
+    x!('git config -f %s vendor.%s.path %s',   FILE, section, path)
+    x!('git config -f %s vendor.%s.branch %s', FILE, section, branch)
+    git_vendor(section, url, path, branch)
   end
 
-  def remove section
+  def remove name, options = {}
     git_working_dir!
-    x!('git config -f %s --remove-section %s', FILE, name)
+    if vendor = git_config[name]
+      path = vendor.fetch('path', File.join('vendor', name))
+      if Dir.exists?(path)
+        puts 'remove %s' % name
+        x!('rm -rf %s', path)
+        x!('git config -f %s --remove-section vendor.%s', FILE, name)
+      end
+    end
   end
 
-  def update section, options = {}
+  def update name, options = {}
     git_working_dir!
-    git_config.each do |name, vendor|
-      next if section && section != name
-
-      puts 'vendor %s' % name
-      url, path, branch = vendor.values_at('url', 'path', 'branch')
-
-      unless Dir.exists?(vendor['path'])
-        puts 'clone %s %s' % [url, path]
-        x!('mkdir -p %s', path)
-        x!('git clone -q --depth=1 %s %s', url, path)
-      end
-
-      Dir.chdir(path) do
-        x!('git reset --hard')
-        x!('git clean -fXd')
-        x!('git checkout -q %s', branch || 'master')
-        x!('git pull')
-      end
-
-      # TODO: add path to a .gitignore in project if it isn't already.
+    git_config.each do |section, vendor|
+      next if name && name != section
+      url    = x!('git ls-remote --get-url %s', vendor.fetch('url'))
+      path   = vendor.fetch('path', File.join('vendor', section))
+      branch = vendor.fetch('branch', 'master')
+      git_vendor(section, url, path, branch)
     end
   end
 
@@ -74,6 +72,24 @@ commands:
       result = %x{#{command % args}}.strip
       $?.success? or exit(1)
       result
+    end
+
+    def git_vendor section, url, path, branch
+      puts 'vendor %s' % section
+      unless Dir.exists?(path)
+        puts 'clone %s %s' % [url, path]
+        x!('mkdir -p %s', path)
+        x!('git clone -q --depth=1 %s %s', url, path) # TODO: suppress depth warning on local clones.
+      end
+
+      Dir.chdir(path) do
+        x!('git reset --hard')
+        x!('git clean -fXd')
+        x!('git checkout -q %s', branch)
+        x!('git pull')
+      end
+
+      # TODO: add path to a .gitignore in project if it isn't already.
     end
 
     def git_working_dir!
@@ -99,14 +115,16 @@ end
 options = {}
 OptionParser.new do |o|
   o.on('-h', '--help'){ options[:help] = true }
-  o.on('-b', '--branch'){|name| options[:branch] = name }
+  o.on('-b', '--branch BRANCH'){|branch| options[:branch] = branch }
+  o.on('-n', '--name NAME'){|name| options[:name] = name }
   o.parse!
 end
 
 vendor  = Vendor.new
 command = (ARGV.shift || 'help').strip
 case command
-  when 'add'    then vendor.add(*ARGV, options)
+  when 'help'   then vendor.help(*ARGV, options)
+  when 'add'    then vendor.add(ARGV.shift, *ARGV, options)
   when 'remove' then vendor.remove(ARGV[0], options)
   when 'update' then vendor.update(ARGV[0], options)
   else
