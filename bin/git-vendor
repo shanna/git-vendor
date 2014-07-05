@@ -15,6 +15,10 @@ commands:
   add     Add a vendored git repository.
   remove  Remove a vendored git repository.
   update  Update vendored git repositories.
+
+options:
+  -b, --branch Branch name to track.
+  -n  --name   Repository/directory clone name.
   }.strip
 
   def help options = {}
@@ -83,13 +87,16 @@ commands:
       unless Dir.exists?(path)
         puts 'clone %s %s' % [url, path]
         x!('mkdir -p %s', path)
-        x!('git clone -q --depth=1 %s %s', url, path) # TODO: suppress depth warning on local clones.
+        x!('git clone -q %s %s', url, path)
       end
 
       Dir.chdir(path) do
         x!('git reset --hard')
         x!('git clean -fXd')
-        x!('git checkout -q %s', branch)
+        if x!('git rev-parse --abbrev-ref HEAD') != branch
+          x!('git branch -ft %s origin/%s', branch, branch)
+          x!('git checkout -qf %s', branch)
+        end
         x!('git pull')
         (options[:exclude] ||= []) << section
         git_config.each{|section, vendor| update(section, options)}
