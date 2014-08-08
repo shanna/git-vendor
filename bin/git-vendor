@@ -121,7 +121,7 @@ options:
         x!('git config -l -f %s', path).split.each do |line|
           fully_qualified_key, value      = line.split('=')
           vendor, section, key            = fully_qualified_key.split('.')
-          (sections[section] ||= {})[key] = value if vendor == 'vendor'
+          (sections[section] ||= {})[key] ||= value if vendor == 'vendor'
         end
         sections
       end
