@@ -11,7 +11,7 @@ TODO:
 ### Make
 
 ```
-got get github.com/shanna/git-vendor
+go get github.com/shanna/git-vendor
 ```
 
 ## Config
