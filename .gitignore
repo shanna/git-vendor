@@ -1,3 +1,6 @@
 # vim junk
 *.swp
 *.swo
+
+# go build
+git-vendor

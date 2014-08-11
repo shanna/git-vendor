@@ -1,0 +1,12 @@
+[vendor "lifx-protocol-c"]
+	url = git@github.com:LIFX/lifx-protocol-c.git
+	path = vendor/lifx-protocol-c
+	branch = master
+[vendor "lifx-lib-c"]
+	url = git@github.com:LIFX/lifx-lib-c.git
+	path = vendor/lifx-lib-c
+	branch = master
+[vendor "uthash"]
+	url = https://github.com/troydhanson/uthash.git
+	path = vendor/uthash
+	branch = master
