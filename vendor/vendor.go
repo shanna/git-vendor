@@ -5,6 +5,8 @@ import (
 	"fmt"
 	git "github.com/libgit2/git2go"
 	"os"
+	"os/user"
+	"path"
 	"strings"
 )
 
@@ -80,6 +82,21 @@ func repositories(config *git.Config) ([]*Repository, error) {
 	return repos, nil
 }
 
+func credentials(url string, username_from_url string, allowed_types git.CredType) (int, *git.Cred) {
+	if allowed_types&git.CredTypeSshKey > 0 {
+		currentUser, _ := user.Current()
+		rc, cred := git.NewCredSshKey(
+			username_from_url,
+			path.Join(currentUser.HomeDir, ".ssh", "id_rsa.pub"),
+			path.Join(currentUser.HomeDir, ".ssh", "id_rsa"),
+			"",
+		)
+		return rc, &cred
+	}
+	rc, cred := git.NewCredDefault()
+	return rc, &cred
+}
+
 func Open(path string) (*Vendor, error) {
 	config, err := discover(path)
 	if err != nil {
@@ -103,7 +120,12 @@ func (r Repository) Vendor() error {
 			return err
 		}
 
-		options := &git.CloneOptions{} // TODO: Progress and credentials?
+		options := &git.CloneOptions{
+			RemoteCallbacks: &git.RemoteCallbacks{
+				CredentialsCallback: credentials,
+			},
+		} // TODO: Progress
+
 		if _, err := git.Clone(r.Url, r.Path, options); err != nil {
 			return err
 		}
@@ -113,6 +135,7 @@ func (r Repository) Vendor() error {
 
 	repository, err := git.OpenRepository(r.Path)
 	if err != nil {
+		fmt.Printf("err:%+V\n", err)
 		return err
 	}
 
