@@ -148,5 +148,26 @@ func (r Repository) Vendor() error {
 		return err
 	}
 
+  reference, err := repository.DwimReference(r.Branch)
+  if err != nil {
+    return err
+  }
+
+  switch reference.Type() {
+  case git.ReferenceSymbolic:
+    return errors.New(fmt.Sprintf("symbolic references not supported yet: %s", r.Branch))
+  case git.ReferenceOid:
+    var signature git.Signature
+    if err := repository.SetHead(reference.Name(), &signature, ""); err != nil {
+      return err
+    }
+
+    options := &git.CheckoutOpts{
+      Strategy: git.CheckoutSafe,
+    } // CloneOptions but CheckoutOpts !?
+    if err := repository.CheckoutHead(options); err != nil {
+      return err
+    }
+  }
 	return nil
 }
